@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Encodings.Web;
 
 namespace Identity.Controllers
 {
@@ -12,11 +13,13 @@ namespace Identity.Controllers
 		private readonly UserManager<ApplicationUser> _userManager;
 		private readonly SignInManager<ApplicationUser> _signInManager;
 		private readonly IEmailSender _emailSender;
-		public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IEmailSender emailSender)
+		private readonly UrlEncoder _urlEncoder;
+		public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IEmailSender emailSender, UrlEncoder urlEncoder)
 		{
 			_signInManager = signInManager;
 			_userManager = userManager;
 			_emailSender = emailSender;
+			_urlEncoder = urlEncoder;
 		}
 		public IActionResult Register(string? returnurl = null)
 		{
@@ -107,6 +110,10 @@ namespace Identity.Controllers
 				if (result.Succeeded)
 				{
 					return LocalRedirect(returnurl);
+				}
+				if (result.RequiresTwoFactor)
+				{
+					return RedirectToAction(nameof(VerifyAuthenticatorCode), new { returnurl, loginViewModel.RememberMe });
 				}
 				if (result.IsLockedOut)
 				{
@@ -211,11 +218,16 @@ namespace Identity.Controllers
 		[Authorize]
 		public async Task<IActionResult> EnableAuthenticator()
 		{
+			string authenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}";
 			var user = await _userManager.GetUserAsync(User);
 			await _userManager.ResetAuthenticatorKeyAsync(user);
 
 			var token = await _userManager.GetAuthenticatorKeyAsync(user);
-			var model = new TwoFactorAuthenticationViewModel() { Token = token };
+
+			// IdentityManger will be title in apps
+			string authUri = string.Format(authenticatorUriFormat, _urlEncoder.Encode("IdentityManger"), _urlEncoder.Encode(user.Email), token);
+
+			var model = new TwoFactorAuthenticationViewModel() { Token = token, QrCodeUrl = authUri };
 			return View(model);
 		}
 
@@ -224,11 +236,11 @@ namespace Identity.Controllers
 		[ValidateAntiForgeryToken]
 		public async Task<IActionResult> EnableAuthenticator(TwoFactorAuthenticationViewModel model)
 		{
-			if(ModelState.IsValid)
+			if (ModelState.IsValid)
 			{
 				var user = await _userManager.GetUserAsync(User);
 				var succeded = await _userManager.VerifyTwoFactorTokenAsync(user, _userManager.Options.Tokens.AuthenticatorTokenProvider, model.Code);
-				if(succeded)
+				if (succeded)
 				{
 					await _userManager.SetTwoFactorEnabledAsync(user, true);
 				}
@@ -244,6 +256,55 @@ namespace Identity.Controllers
 		public IActionResult AuthenticatorConfirmation()
 		{
 			return View();
+		}
+
+		public async Task<IActionResult> VerifyAuthenticatorCode(bool rememberMe, string returnUrl = null)
+		{
+			var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
+			if (user == null)
+			{
+				return View("Error");
+			}
+			ViewData["ReturnUrl"] = returnUrl;
+
+			return View(new VerifyAuthenticatorViewModel() { ReturnUrl = returnUrl, RememberMe = rememberMe });
+		}
+
+		[HttpPost]
+		[ValidateAntiForgeryToken]
+		[Authorize]
+		public async Task<IActionResult> VerifyAuthenticatorCode(VerifyAuthenticatorViewModel model)
+		{
+			model.ReturnUrl = model.ReturnUrl ?? Url.Content("~/");
+			if(!ModelState.IsValid)
+			{
+				return View(model);
+			}
+
+			var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(model.Code, model.RememberMe, rememberClient : false);
+			if(result.Succeeded)
+			{
+				return LocalRedirect(model.ReturnUrl);
+			}
+			if(result.IsLockedOut)
+			{
+				return View("Lockout");
+			}
+			else
+			{
+				ModelState.AddModelError(string.Empty, "Invalid login attempt");
+				return View(model);
+			}
+		}
+
+		[Authorize]
+		public async Task<IActionResult> RemoveAuthenticator()
+		{
+			var user = await _userManager.GetUserAsync(User);
+			await _userManager.ResetAuthenticatorKeyAsync(user);
+			await _userManager.SetTwoFactorEnabledAsync(user, false);
+
+			return RedirectToAction(nameof(Index), "Home");
 		}
 
     }
