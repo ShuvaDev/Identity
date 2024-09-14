@@ -1,5 +1,6 @@
 ﻿using Identity.Models;
 using Identity.Models.ViewModels;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -39,7 +40,7 @@ namespace Identity.Controllers
 					Name = registerViewModel.Name,
 				};
 				var result = await _userManager.CreateAsync(user, registerViewModel.Password);
-				if(result.Succeeded)
+				if (result.Succeeded)
 				{
 					var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 					var callbackUrl = Url.Action("ConfirmEmail", "Account", new
@@ -55,7 +56,7 @@ namespace Identity.Controllers
 				}
 				else
 				{
-					foreach(IdentityError error in result.Errors)
+					foreach (IdentityError error in result.Errors)
 					{
 						ModelState.AddModelError(string.Empty, error.Description);
 					}
@@ -68,12 +69,12 @@ namespace Identity.Controllers
 		public async Task<IActionResult> ConfirmEmail(string code, string userId)
 		{
 			var user = await _userManager.FindByIdAsync(userId);
-			if(user == null)
+			if (user == null)
 			{
 				return View("Error");
 			}
 			var result = await _userManager.ConfirmEmailAsync(user, code);
-			if(result.Succeeded)
+			if (result.Succeeded)
 			{
 				return View();
 			}
@@ -100,14 +101,14 @@ namespace Identity.Controllers
 		public async Task<IActionResult> Login(LoginViewModel loginViewModel, string? returnurl)
 		{
 			returnurl = returnurl ?? Url.Content("~/");
-			if(ModelState.IsValid)
+			if (ModelState.IsValid)
 			{
 				var result = await _signInManager.PasswordSignInAsync(loginViewModel.Email, loginViewModel.Password, isPersistent: loginViewModel.RememberMe, lockoutOnFailure: true);
-				if(result.Succeeded)
+				if (result.Succeeded)
 				{
 					return LocalRedirect(returnurl);
 				}
-				if(result.IsLockedOut)
+				if (result.IsLockedOut)
 				{
 					return View("Lockout");
 				}
@@ -131,11 +132,11 @@ namespace Identity.Controllers
 		[ValidateAntiForgeryToken]
 		public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel forgotPasswordViewModel)
 		{
-			if(ModelState.IsValid)
+			if (ModelState.IsValid)
 			{
 				var user = await _userManager.FindByEmailAsync(forgotPasswordViewModel.Email);
 
-				if(user == null)
+				if (user == null)
 				{
 					return RedirectToAction("ForgotPasswordConfirmation");
 				}
@@ -143,10 +144,10 @@ namespace Identity.Controllers
 				var callbackUrl = Url.Action("ResetPassword", "Account", new
 				{
 					userid = user.Id,
-					code 
+					code
 				}, protocol: HttpContext.Request.Scheme);
 				await _emailSender.SendEmailAsync(forgotPasswordViewModel.Email, "Reset Password", $"Please reset your password by clicking here - <a href='{callbackUrl}'>Link</a>");
-				
+
 				return RedirectToAction("ForgotPasswordConfirmation");
 			}
 			return View(forgotPasswordViewModel);
@@ -174,7 +175,7 @@ namespace Identity.Controllers
 					return RedirectToAction("ResetPasswordConfirmation");
 				}
 				var result = await _userManager.ResetPasswordAsync(user, model.Code, model.Password);
-				if(result.Succeeded)
+				if (result.Succeeded)
 				{
 					return RedirectToAction("ResetPasswordConfirmation");
 				}
@@ -196,7 +197,7 @@ namespace Identity.Controllers
 		public async Task<IActionResult> IsEmailAlreadyRegisterd(string email)
 		{
 			ApplicationUser user = await _userManager.FindByEmailAsync(email);
-			if(user == null)
+			if (user == null)
 			{
 				return Json(true);
 			}
@@ -205,5 +206,45 @@ namespace Identity.Controllers
 				return Json(false);
 			}
 		}
-	}
+
+		// For two factor authentication
+		[Authorize]
+		public async Task<IActionResult> EnableAuthenticator()
+		{
+			var user = await _userManager.GetUserAsync(User);
+			await _userManager.ResetAuthenticatorKeyAsync(user);
+
+			var token = await _userManager.GetAuthenticatorKeyAsync(user);
+			var model = new TwoFactorAuthenticationViewModel() { Token = token };
+			return View(model);
+		}
+
+		[Authorize]
+		[HttpPost]
+		[ValidateAntiForgeryToken]
+		public async Task<IActionResult> EnableAuthenticator(TwoFactorAuthenticationViewModel model)
+		{
+			if(ModelState.IsValid)
+			{
+				var user = await _userManager.GetUserAsync(User);
+				var succeded = await _userManager.VerifyTwoFactorTokenAsync(user, _userManager.Options.Tokens.AuthenticatorTokenProvider, model.Code);
+				if(succeded)
+				{
+					await _userManager.SetTwoFactorEnabledAsync(user, true);
+				}
+				else
+				{
+					ModelState.AddModelError("Verify", "Your two factor auth code could not be validated!");
+					return View(model);
+				}
+				return RedirectToAction("AuthenticatorConfirmation");
+			}
+			return View("Error");
+		}
+		public IActionResult AuthenticatorConfirmation()
+		{
+			return View();
+		}
+
+    }
 }
