@@ -1,0 +1,56 @@
+﻿@model Microsoft.AspNetCore.Identity.IdentityRole
+
+@{
+	var title = "Create Role";
+	if(Model != null &&  !string.IsNullOrEmpty(Model.NormalizedName))
+	{
+		title = "Edit Role";
+	}
+}
+
+<div class="row col-md-10 offset-md-1">
+	<h1 class="text-primary text-center pt-2">@title</h1>
+	<form method="post">
+		<div class="border p-2 rounded">
+			@if (Model != null && !string.IsNullOrEmpty(Model.NormalizedName))
+			{
+			<div class="form-group">
+				<label asp-for="Id" class="col-12"></label>
+				<div class="col-md-12">
+					<input asp-for="Id" readonly class="form-control" />
+					<input asp-for="NormalizedName" type="hidden" class="form-control" />
+				</div>
+			</div>
+			}
+
+			<div class="form-group">
+				<label asp-for="Name" class="col-12"></label>
+				<div class="col-md-12">
+					<input asp-for="Name" class="form-control" required/>
+					<span asp-validation-for="Name" class="text-danger"></span>
+				</div>
+			</div>
+
+				<div class="form-group pt-3">
+						<div class="col-md-6 offset-md-3">
+						@if (Model != null && !string.IsNullOrEmpty(Model.NormalizedName))
+						{
+							<button class="btn btn-success form-control" type="submit">Update</button>
+						}
+						else
+						{
+						<button class="btn btn-success form-control" type="submit">Create</button>
+						}
+					</div>
+				</div>
+			
+			
+		</div>
+	</form>
+</div>
+
+@section Scripts {
+	@{
+		await Html.RenderPartialAsync("_ValidationScriptsPartial");
+	}
+}
