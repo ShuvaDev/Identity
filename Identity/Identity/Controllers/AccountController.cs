@@ -12,19 +12,35 @@ namespace Identity.Controllers
 	{
 		private readonly UserManager<ApplicationUser> _userManager;
 		private readonly SignInManager<ApplicationUser> _signInManager;
+		private readonly RoleManager<IdentityRole> _roleManager;
 		private readonly IEmailSender _emailSender;
 		private readonly UrlEncoder _urlEncoder;
-		public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IEmailSender emailSender, UrlEncoder urlEncoder)
+		public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, RoleManager<IdentityRole> roleManager, IEmailSender emailSender, UrlEncoder urlEncoder)
 		{
 			_signInManager = signInManager;
 			_userManager = userManager;
+			_roleManager = roleManager;
 			_emailSender = emailSender;
 			_urlEncoder = urlEncoder;
 		}
-		public IActionResult Register(string? returnurl = null)
+		public async Task<IActionResult> Register(string? returnurl = null)
 		{
-			@ViewData["ReturnUrl"] = returnurl;
-			RegisterViewModel registerViewModel = new();
+			if(!_roleManager.RoleExistsAsync(SD.Admin).GetAwaiter().GetResult())
+			{
+				await _roleManager.CreateAsync(new IdentityRole(SD.Admin));
+				await _roleManager.CreateAsync(new IdentityRole(SD.User));
+			}
+
+			RegisterViewModel registerViewModel = new() {
+				RoleList = _roleManager.Roles.Select(r => r.Name).Select(r => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem()
+				{
+					Text = r,
+					Value = r
+				})
+			};
+
+			ViewData["ReturnUrl"] = returnurl;
+
 			return View(registerViewModel);
 		}
 
@@ -51,8 +67,19 @@ namespace Identity.Controllers
 						userid = user.Id,
 						code
 					}, protocol: HttpContext.Request.Scheme);
-					await _emailSender.SendEmailAsync(registerViewModel.Email, "Confirm Email", $"Please confirm your email by clicking here - <a href='{callbackUrl}'>Link</a>");
-
+					// await _emailSender.SendEmailAsync(registerViewModel.Email, "Confirm Email", $"Please confirm your email by clicking here - <a href='{callbackUrl}'>Link</a>");
+                    
+					// ToDo : মেইল কনফার্মশেন মেসেজ পাঠানোর পরে ইউজারকে কনফার্ম করতে বলার জন্য ভিউ বানাতে হবে।
+                    //      : মেইন কনফার্মশেন না হলে লগিন করতে দেওয়া যাবে না।
+                    
+					if(registerViewModel.RoleSelect != null && registerViewModel.RoleSelect == SD.Admin)
+					{
+						await _userManager.AddToRoleAsync(user, SD.Admin);
+					}
+					else
+					{
+						await _userManager.AddToRoleAsync(user, SD.User);
+					}
 
 					await _signInManager.SignInAsync(user, isPersistent: false);
 					return LocalRedirect(returnurl);
@@ -65,6 +92,11 @@ namespace Identity.Controllers
 					}
 				}
 			}
+			registerViewModel.RoleList = _roleManager.Roles.Select(r => r.Name).Select(r => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem()
+			{
+				Text = r,
+				Value = r
+			});
 
 			return View(registerViewModel);
 		}
@@ -213,9 +245,16 @@ namespace Identity.Controllers
 				return Json(false);
 			}
 		}
-
-		// For two factor authentication
-		[Authorize]
+        public IActionResult Error()
+        {
+            return View();
+        }
+        public IActionResult NoAccess()
+        {
+            return View();
+        }
+        // For two factor authentication
+        [Authorize]
 		public async Task<IActionResult> EnableAuthenticator()
 		{
 			string authenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}";
@@ -253,11 +292,13 @@ namespace Identity.Controllers
 			}
 			return View("Error");
 		}
+		[Authorize]
 		public IActionResult AuthenticatorConfirmation()
 		{
 			return View();
 		}
 
+		[Authorize]
 		public async Task<IActionResult> VerifyAuthenticatorCode(bool rememberMe, string returnUrl = null)
 		{
 			var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();

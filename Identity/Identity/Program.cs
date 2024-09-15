@@ -17,6 +17,10 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
 	.AddEntityFrameworkStores<ApplicationDbContext>()
 	.AddDefaultTokenProviders();
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+	options.AccessDeniedPath = "/Account/NoAccess";
+});
 builder.Services.Configure<IdentityOptions>(options =>
 {
 	options.Password.RequireUppercase = false;
