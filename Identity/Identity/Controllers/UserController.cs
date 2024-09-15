@@ -3,6 +3,7 @@ using Identity.Models;
 using Identity.Models.ViewModels;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Identity.Controllers
 {
@@ -123,5 +124,63 @@ namespace Identity.Controllers
             return RedirectToAction(nameof(Index));
 
         }
-    }
+		// For Claim Management
+		public async Task<IActionResult> ManageUserClaim(string userId)
+		{
+			ApplicationUser user = await _userManager.FindByIdAsync(userId);
+			if (user == null)
+			{
+				return View("Error");
+			}
+
+			var existingClaims = await _userManager.GetClaimsAsync(user);
+			var model = new ClaimsViewModel()
+			{
+				User = user
+			};
+
+			foreach (Claim claim in ClaimStore.claimsList)
+			{
+				ClaimSelection claimSelection = new ClaimSelection()
+				{
+					ClaimName = claim.Type
+				};
+				if (existingClaims.Any(c => c.Type == claim.Type))
+				{
+					claimSelection.IsSelected = true;
+				}
+				model.ClaimsList.Add(claimSelection);
+			}
+
+			return View(model);
+		}
+		[HttpPost]
+		[ValidateAntiForgeryToken]
+		public async Task<IActionResult> ManageUserClaim(ClaimsViewModel model)
+		{
+			ApplicationUser user = await _userManager.FindByIdAsync(model.User.Id);
+			if (user == null)
+			{
+				return View("Error");
+			}
+			var oldClaims = await _userManager.GetClaimsAsync(user);
+			var result = await _userManager.RemoveClaimsAsync(user, oldClaims);
+
+			if (!result.Succeeded)
+			{
+				TempData["Error"] = "Error While Removing Claim";
+				return View(model);
+			}
+
+			result = await _userManager.AddClaimsAsync(user, model.ClaimsList.Where(c => c.IsSelected).Select(c => new Claim(c.ClaimName, c.IsSelected.ToString())));
+
+			if (!result.Succeeded)
+			{
+				TempData["Error"] = "Error While Adding Claim";
+				return View(model);
+			}
+			TempData["Success"] = "Claim Assigned Successfully";
+			return RedirectToAction(nameof(Index));
+		}
+	}
 }
