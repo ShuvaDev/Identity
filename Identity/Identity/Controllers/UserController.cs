@@ -18,20 +18,17 @@ namespace Identity.Controllers
             _roleManager = roleManager;
             _db = db;
         }
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
             var users = _db.ApplicationUsers.ToList();
-            var roles = _db.Roles.ToList();
-            var userRoles = _db.UserRoles.ToList();
 
             foreach (var user in users)
             {
-                var userRoleId = userRoles.FirstOrDefault(u => u.UserId == user.Id)?.RoleId;
+                var user_role = await _userManager.GetRolesAsync(user) as List<String>;
 
-                if (userRoleId != null)
+                if (user_role != null)
                 {
-                    var roleName = roles.FirstOrDefault(r => r.Id == userRoleId)?.Name;
-                    user.Role = roleName;
+                    user.Role = string.Join(",", user_role);
                 }
                 else
                 {

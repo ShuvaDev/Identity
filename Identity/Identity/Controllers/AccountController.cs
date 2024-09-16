@@ -72,9 +72,9 @@ namespace Identity.Controllers
 					// ToDo : মেইল কনফার্মশেন মেসেজ পাঠানোর পরে ইউজারকে কনফার্ম করতে বলার জন্য ভিউ বানাতে হবে।
                     //      : মেইন কনফার্মশেন না হলে লগিন করতে দেওয়া যাবে না।
                     
-					if(registerViewModel.RoleSelect != null && registerViewModel.RoleSelect == SD.Admin)
+					if(registerViewModel.RoleSelect != null)
 					{
-						await _userManager.AddToRoleAsync(user, SD.Admin);
+						await _userManager.AddToRoleAsync(user, registerViewModel.RoleSelect);
 					}
 					else
 					{
