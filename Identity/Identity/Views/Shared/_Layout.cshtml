@@ -33,6 +33,20 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-controller="Role" asp-action="Index">Roles</a>
                         </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Access Checker</a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="AllAccess">All Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="AuthorizedAccess">Authorized Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="UserOrAdminRoleAccess">User or Admin Role Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="UserAndAdminRoleAccess">User and Admin Role Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="AdminRoleAccess">Admin Role Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="Admin_CreateAccess">Admin Role with Create Claim Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="Admin_Create_Edit_DeleteAccess">Admin Role with Create, Edit and Delete Claim Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="Admin_Create_Edit_DeleteAccess_or_SuperAdminRole">Admin Role with Create & Edit & Delete Claim || Super Admin Role Access</a></li>
+                                <li><a class="dropdown-item" asp-controller="AccessChecker" asp-action="OnlyShuva">Only Shuva</a></li>
+                            </ul>
+                        </li>
                     </ul>
                     <partial name="_LoginPartial" />
                 </div>

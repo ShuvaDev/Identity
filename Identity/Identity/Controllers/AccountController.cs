@@ -57,6 +57,7 @@ namespace Identity.Controllers
 					UserName = registerViewModel.Email,
 					Email = registerViewModel.Email,
 					Name = registerViewModel.Name,
+					DateCreated = DateTime.Now
 				};
 				var result = await _userManager.CreateAsync(user, registerViewModel.Password);
 				if (result.Succeeded)

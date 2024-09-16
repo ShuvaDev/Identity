@@ -25,15 +25,12 @@ namespace Identity.Controllers
             foreach (var user in users)
             {
                 var user_role = await _userManager.GetRolesAsync(user) as List<String>;
+                user.Role = string.Join(",", user_role);
+                
+                var user_claim = _userManager.GetClaimsAsync(user).GetAwaiter().GetResult().Select(c => c.Type);
+                user.UserClaims = string.Join(",", user_claim);
 
-                if (user_role != null)
-                {
-                    user.Role = string.Join(",", user_role);
-                }
-                else
-                {
-                    user.Role = "None";
-                }
+                
             }
 
             return View(users);
