@@ -51,8 +51,12 @@ builder.Services.AddAuthorization(options =>
 	// Custom policy
 	options.AddPolicy("OnlySuperAdminChecker", policy => policy.Requirements.Add(new OnlySuperAdminChecker()));
 	options.AddPolicy("AdminWithMoreThan1000Days", policy => policy.Requirements.Add(new AdminWithMoreThan1000DaysRequirement(1000)));
+});
 
-	
+builder.Services.AddAuthentication().AddFacebook(options =>
+{
+	options.AppId = "7447217882048516";
+	options.AppSecret = "fb71a0d4534a01aeb6996c143fab3258";
 });
 
 builder.Services.AddScoped<INumberOfDaysForAccount, NumberOfDaysForAccount>();

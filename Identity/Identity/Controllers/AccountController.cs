@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages;
+using System.Security.Claims;
 using System.Text.Encodings.Web;
 
 namespace Identity.Controllers
@@ -349,5 +351,107 @@ namespace Identity.Controllers
 			return RedirectToAction(nameof(Index), "Home");
 		}
 
-    }
+		// For external login
+		[HttpPost]
+		[ValidateAntiForgeryToken]
+		public IActionResult ExternalLogin(string provider, string? returnUrl = null)
+		{
+			var redirectUrl = Url.Action("ExternalLoginCallback", "Account", new { returnUrl });
+			var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+
+			return Challenge(properties, provider);
+		}
+
+		public async Task<IActionResult> ExternalLoginCallback(string? returnUrl = null, string? remoteError = null)
+		{
+			returnUrl = returnUrl ?? Url.Content("~/");
+			if(remoteError != null)
+			{
+				ModelState.AddModelError(string.Empty, $"Error from external provider - {remoteError}");
+				return View(nameof(Login));
+			}
+
+			var info = await _signInManager.GetExternalLoginInfoAsync();
+			if(info == null)
+			{
+				return RedirectToAction(nameof(Login));
+			}
+
+			// sign in the user with external login provider. only if they have a login
+			var result = await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, isPersistent: false, bypassTwoFactor: true);
+
+			if (result.Succeeded)
+			{
+				await _signInManager.UpdateExternalAuthenticationTokensAsync(info);
+				return LocalRedirect(returnUrl);
+			}
+			if (result.RequiresTwoFactor)
+			{
+				return RedirectToAction(nameof(VerifyAuthenticatorCode), new { returnurl = returnUrl });
+			}
+			else
+			{
+				// that means user account is not create and we will display a view to create account.
+				ViewData["ReturnUrl"] = returnUrl;
+				ViewData["ProviderDisplayName"] = info.ProviderDisplayName;
+
+				return View("ExternalLoginConfirmation", new ExternalLoginConfirmationViewModel()
+				{
+					Name = info.Principal.FindFirstValue(ClaimTypes.Name),
+					Email = info.Principal.FindFirstValue(ClaimTypes.Email)
+				});
+			}
+		}
+
+		[HttpPost]
+		[ValidateAntiForgeryToken]
+
+		public async Task<IActionResult> ExternalLoginConfirmation(ExternalLoginConfirmationViewModel model,string? returnurl = null)
+		{
+			returnurl = returnurl ?? Url.Content("~/");
+			if (ModelState.IsValid)
+			{
+				var info = await _signInManager.GetExternalLoginInfoAsync();
+				if(info == null)
+				{
+					return View("Error");
+				}
+
+				var user = new ApplicationUser()
+				{
+					UserName = model.Email,
+					Email = model.Email,
+					Name = model.Name,
+					NormalizedEmail = model.Email.ToUpper(),
+					DateCreated = DateTime.Now
+				};
+
+				var result = await _userManager.CreateAsync(user);
+				if (result.Succeeded)
+				{
+					await _userManager.AddToRoleAsync(user, SD.User);
+
+					result = await _userManager.AddLoginAsync(user, info);
+
+					if(result.Succeeded)
+					{
+						await _signInManager.SignInAsync(user, isPersistent: false);
+						await _signInManager.UpdateExternalAuthenticationTokensAsync(info);
+					}
+
+					return LocalRedirect(returnurl);
+				}
+				else
+				{
+					foreach (IdentityError error in result.Errors)
+					{
+						ModelState.AddModelError(string.Empty, error.Description);
+					}
+				}
+			}
+			ViewData["ReturnUrl"] = returnurl;
+			return View(model);
+		}
+
+	}
 }
